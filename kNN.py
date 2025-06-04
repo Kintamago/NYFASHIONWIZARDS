@@ -48,8 +48,58 @@ plt.legend()
 plt.grid()
 plt.savefig('kNN_accuracy_plot.png')
 plt.show()
-# 4. Plot the results
-# The plot is saved as 'kNN_accuracy_plot.png' and displayed using plt.show()
+
+# Analysis with varying training data sizes
+print("\nAnalyzing KNN performance with varying training data sizes...")
+data_sizes = [10000, 20000, 30000, 40000, 50000, 60000]
+size_train_accuracies = []
+size_test_accuracies = []
+size_train_errors = []
+size_test_errors = []
+
+# Use the best k value from previous analysis
+best_k = 5  # You can adjust this based on your previous results
+
+for size in data_sizes:
+    # Create a subset of the training data
+    indices = np.random.choice(len(X_train), size, replace=False)
+    x_train_subset = X_train[indices]
+    y_train_subset = y_train[indices]
+    
+    # Train KNN model
+    knn = KNeighborsClassifier(n_neighbors=best_k)
+    knn.fit(x_train_subset, y_train_subset)
+    
+    # Calculate accuracies
+    train_pred = knn.predict(x_train_subset)
+    test_pred = knn.predict(X_test)
+    
+    train_acc = accuracy_score(y_train_subset, train_pred)
+    test_acc = accuracy_score(y_test, test_pred)
+    
+    size_train_accuracies.append(train_acc)
+    size_test_accuracies.append(test_acc)
+    size_train_errors.append(1 - train_acc)
+    size_test_errors.append(1 - test_acc)
+    
+    print(f"\nTraining data size: {size}")
+    print(f"Training accuracy: {train_acc:.4f}")
+    print(f"Test accuracy: {test_acc:.4f}")
+
+# Plot the results for data size analysis
+plt.figure(figsize=(10, 6))
+plt.plot(data_sizes, size_train_accuracies, 'b-', label='Training Accuracy')
+plt.plot(data_sizes, size_test_accuracies, 'r-', label='Test Accuracy')
+plt.plot(data_sizes, size_train_errors, 'b--', label='Training Error')
+plt.plot(data_sizes, size_test_errors, 'r--', label='Test Error')
+plt.xlabel('Training Data Size')
+plt.ylabel('Rate')
+plt.title(f'KNN Performance vs Training Data Size (k={best_k})')
+plt.legend()
+plt.grid(True)
+plt.savefig('kNN_training_size_plot.png')
+plt.show()
+
 # The code above loads the FashionMNIST dataset, flattens the images, trains a kNN classifier with varying k values,
 # and plots the training and testing accuracies against the number of neighbors.
 # The plot shows how the accuracy changes with different values of k, helping to visualize the performance of the kNN classifier.
