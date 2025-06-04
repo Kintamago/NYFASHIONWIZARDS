@@ -20,34 +20,34 @@ X_test = test_set.data.view(-1, 28 * 28).numpy() / 255.0
 y_test = test_set.targets.numpy()
 
 # 3. Fit kNN classifier
-n_sizes = [1, 3, 5, 7, 9, 11, 13, 15]
-training_accuracies = []
-testing_accuracies = []
-for n in n_sizes:
-    knn = KNeighborsClassifier(n_neighbors=n)
-    knn.fit(X_train, y_train)
+# n_sizes = [1, 3, 5, 7, 9, 11, 13, 15]
+# training_accuracies = []
+# testing_accuracies = []
+# for n in n_sizes:
+#     knn = KNeighborsClassifier(n_neighbors=n)
+#     knn.fit(X_train, y_train)
     
-    # Training accuracy
-    y_train_pred = knn.predict(X_train)
-    train_acc = accuracy_score(y_train, y_train_pred)
-    training_accuracies.append(train_acc)
+#     # Training accuracy
+#     y_train_pred = knn.predict(X_train)
+#     train_acc = accuracy_score(y_train, y_train_pred)
+#     training_accuracies.append(train_acc)
     
-    # Testing accuracy
-    y_test_pred = knn.predict(X_test)
-    test_acc = accuracy_score(y_test, y_test_pred)
-    testing_accuracies.append(test_acc)
+#     # Testing accuracy
+#     y_test_pred = knn.predict(X_test)
+#     test_acc = accuracy_score(y_test, y_test_pred)
+#     testing_accuracies.append(test_acc)
 
 
-plt.plot(n_sizes, training_accuracies, label='Training Accuracy', marker='o')
-plt.plot(n_sizes, testing_accuracies, label='Testing Accuracy', marker='o')
-plt.xlabel('Number of Neighbors (k)')
-plt.ylabel('Accuracy')
-plt.title('kNN Classifier Accuracy on FashionMNIST')
-plt.xticks(n_sizes)
-plt.legend()
-plt.grid()
-plt.savefig('kNN_accuracy_plot.png')
-plt.show()
+# plt.plot(n_sizes, training_accuracies, label='Training Accuracy', marker='o')
+# plt.plot(n_sizes, testing_accuracies, label='Testing Accuracy', marker='o')
+# plt.xlabel('Number of Neighbors (k)')
+# plt.ylabel('Accuracy')
+# plt.title('kNN Classifier Accuracy on FashionMNIST')
+# plt.xticks(n_sizes)
+# plt.legend()
+# plt.grid()
+# plt.savefig('kNN_accuracy_plot.png')
+# plt.show()
 
 # Analysis with varying training data sizes
 print("\nAnalyzing KNN performance with varying training data sizes...")
@@ -90,10 +90,8 @@ for size in data_sizes:
 plt.figure(figsize=(10, 6))
 plt.plot(data_sizes, size_train_accuracies, 'b-', label='Training Accuracy')
 plt.plot(data_sizes, size_test_accuracies, 'r-', label='Test Accuracy')
-plt.plot(data_sizes, size_train_errors, 'b--', label='Training Error')
-plt.plot(data_sizes, size_test_errors, 'r--', label='Test Error')
 plt.xlabel('Training Data Size')
-plt.ylabel('Rate')
+plt.ylabel('Accuracy')
 plt.title(f'KNN Performance vs Training Data Size (k={best_k})')
 plt.legend()
 plt.grid(True)
