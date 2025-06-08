@@ -3,80 +3,126 @@ import torch.nn as nn
 import torch.optim as optim
 import torchvision
 import torchvision.transforms as transforms
-import os
+import matplotlib.pyplot as plt
 
-# Use GPU if available
+# Device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f"Using device: {device}")
 
-# Create models directory first
-os.makedirs('./models', exist_ok=True)
-
-# Define Larger CNN
-class BiggerCNN(nn.Module):
-    def __init__(self):
-        super(BiggerCNN, self).__init__()
-        self.conv1 = nn.Conv2d(1, 32, 3, padding=1)
-        self.conv2 = nn.Conv2d(32, 64, 3, padding=1)
-        self.conv3 = nn.Conv2d(64, 128, 3, padding=1)
-        self.conv4 = nn.Conv2d(128, 128, 3, padding=1)
-        self.pool = nn.MaxPool2d(2, 2)
-        self.dropout = nn.Dropout(0.5)
-
-        self.fc1 = nn.Linear(128 * 1 * 1, 512) 
-        self.fc2 = nn.Linear(512, 128)
-        self.fc3 = nn.Linear(128, 10)
-
-    def forward(self, x):
-        x = self.pool(torch.relu(self.conv1(x)))   # 28x28 -> 14x14
-        x = self.pool(torch.relu(self.conv2(x)))   # 14x14 -> 7x7
-        x = self.pool(torch.relu(self.conv3(x)))   # 7x7 -> 3x3
-        x = self.pool(torch.relu(self.conv4(x)))   # 3x3 -> 1x1
-        x = x.view(-1, 128 * 1 * 1) 
-        x = self.dropout(torch.relu(self.fc1(x)))
-        x = self.dropout(torch.relu(self.fc2(x)))
-        x = self.fc3(x)
-        return x
-# Load Data
+# Transform
 transform = transforms.Compose([
     transforms.ToTensor(),
     transforms.Normalize((0.5,), (0.5,))
 ])
 
-trainset = torchvision.datasets.FashionMNIST(
-    root='./data', train=True, download=True, transform=transform)
-trainloader = torch.utils.data.DataLoader(
-    trainset, batch_size=32, shuffle=True)
+# Load datasets
+full_trainset = torchvision.datasets.FashionMNIST(root='./data', train=True, download=True, transform=transform)
+testset = torchvision.datasets.FashionMNIST(root='./data', train=False, download=True, transform=transform)
+testloader = torch.utils.data.DataLoader(testset, batch_size=64, shuffle=False)
 
-# Instantiate model, loss, optimizer
-net = BiggerCNN().to(device)  # move model to GPU
-criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(net.parameters(), lr=0.001)
+# CNN with flexible activation
+class SimpleDeepCNN(nn.Module):
+    def __init__(self, activation_fn):
+        super(SimpleDeepCNN, self).__init__()
+        act = activation_fn()
+        self.model = nn.Sequential(
+            nn.Conv2d(1, 32, 3, padding=1), act,
+            nn.Conv2d(32, 64, 3, padding=1), act,
+            nn.MaxPool2d(2, 2),
 
-print("Starting training...")
+            nn.Conv2d(64, 128, 3, padding=1), act,
+            nn.Conv2d(128, 128, 3, padding=1), act,
+            nn.MaxPool2d(2, 2),
 
-# Train Loop
-for epoch in range(10):
-    running_loss = 0.0
-    for i, (inputs, labels) in enumerate(trainloader):
-        inputs, labels = inputs.to(device), labels.to(device)  # move data to GPU
+            nn.Conv2d(128, 256, 3, padding=1), act,
+            nn.MaxPool2d(2, 2),
 
-        optimizer.zero_grad()
-        outputs = net(inputs)
-        loss = criterion(outputs, labels)
-        loss.backward()
-        optimizer.step()
+            nn.Flatten(),
+            nn.Linear(256 * 3 * 3, 128), act,
+            nn.Linear(128, 10)
+        )
 
-        running_loss += loss.item()
-        if i % 100 == 99:
-            print(f"[{epoch + 1}, {i + 1}] loss: {running_loss / 100:.3f}")
-            running_loss = 0.0
+    def forward(self, x):
+        return self.model(x)
 
-print("Finished Training")
+# Train & Evaluate
+def train_and_test(sample_size, activation_fn):
+    train_subset, _ = torch.utils.data.random_split(full_trainset, [sample_size, len(full_trainset) - sample_size])
+    trainloader = torch.utils.data.DataLoader(train_subset, batch_size=64, shuffle=True)
 
-# Save the model
-torch.save(net.state_dict(), './models/fashion_cnn_weights.pth')
-print("Model weights saved to './models/fashion_cnn_weights.pth'")
+    model = SimpleDeepCNN(activation_fn).to(device)
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    loss_fn = nn.CrossEntropyLoss()
 
-torch.save(net, './models/fashion_cnn_complete.pth')
-print("Complete model saved to './models/fashion_cnn_complete.pth'")
+    model.train()
+    for _ in range(1):  # 1 epoch
+        for imgs, labels in trainloader:
+            imgs, labels = imgs.to(device), labels.to(device)
+            optimizer.zero_grad()
+            loss = loss_fn(model(imgs), labels)
+            loss.backward()
+            optimizer.step()
+
+    # Evaluate
+    model.eval()
+    correct, total = 0, 0
+    with torch.no_grad():
+        for imgs, labels in testloader:
+            imgs, labels = imgs.to(device), labels.to(device)
+            preds = model(imgs).argmax(dim=1)
+            correct += (preds == labels).sum().item()
+            total += labels.size(0)
+
+    error = 100 * (1 - correct / total)
+    return error
+
+# Settings
+learning_rates = [0.0001, 0.001, 0.005, 0.01, 0.05]
+sample_size = 30000
+activation_fn = nn.ReLU  # fixed activation
+
+errors = []
+
+for lr in learning_rates:
+    def train_with_lr(sample_size, activation_fn, lr):
+        train_subset, _ = torch.utils.data.random_split(full_trainset, [sample_size, len(full_trainset) - sample_size])
+        trainloader = torch.utils.data.DataLoader(train_subset, batch_size=64, shuffle=True)
+
+        model = SimpleDeepCNN(activation_fn).to(device)
+        optimizer = optim.Adam(model.parameters(), lr=lr)
+        loss_fn = nn.CrossEntropyLoss()
+
+        model.train()
+        for _ in range(1):  # 1 epoch
+            for imgs, labels in trainloader:
+                imgs, labels = imgs.to(device), labels.to(device)
+                optimizer.zero_grad()
+                loss = loss_fn(model(imgs), labels)
+                loss.backward()
+                optimizer.step()
+
+        # Evaluate
+        model.eval()
+        correct, total = 0, 0
+        with torch.no_grad():
+            for imgs, labels in testloader:
+                imgs, labels = imgs.to(device), labels.to(device)
+                preds = model(imgs).argmax(dim=1)
+                correct += (preds == labels).sum().item()
+                total += labels.size(0)
+
+        return 100 * (1 - correct / total)
+
+    error = train_with_lr(sample_size, activation_fn, lr)
+    errors.append(error)
+
+# Plot
+plt.figure(figsize=(8, 5))
+plt.plot(learning_rates, errors, marker='o')
+plt.xscale('log')
+plt.title("Test Error vs Learning Rate")
+plt.xlabel("Learning Rate (log scale)")
+plt.ylabel("Test Error Rate (%)")
+plt.grid(True)
+plt.tight_layout()
+plt.savefig("lr_vs_error.png")
+plt.show()
